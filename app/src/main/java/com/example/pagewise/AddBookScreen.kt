@@ -2,6 +2,7 @@ package com.example.pagewise
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,6 +41,10 @@ fun AddBookScreen(
     bookToEdit: Book? = null, // Parameter baru: Kalau null berarti Mode Tambah, kalau ada isi berarti Mode Edit
     onNavigateBack: () -> Unit
 ) {
+
+    BackHandler {
+        onNavigateBack()
+    }
     // --- STATE FORM (Diisi data lama kalo mode edit) ---
     var title by remember { mutableStateOf(bookToEdit?.title ?: "") }
     var subtitle by remember { mutableStateOf(bookToEdit?.subtitle ?: "") }

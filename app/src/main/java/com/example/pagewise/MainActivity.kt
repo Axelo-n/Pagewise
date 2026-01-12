@@ -32,36 +32,115 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 1. Inisialisasi SharedPreferences
+        val sharedPrefs = getSharedPreferences("PagewisePrefs", MODE_PRIVATE)
+
         setContent {
             PagewiseTheme {
                 val context = LocalContext.current
                 val db = remember { AppDatabase.getDatabase(context) }
                 val bookDao = db.bookDao()
 
+                // 2. Ambil nama yang tersimpan (default "" kalau kosong)
+                var userName by remember {
+                    mutableStateOf(sharedPrefs.getString("user_name", "") ?: "")
+                }
+
                 // STATE NAVIGASI
                 var currentScreen by remember { mutableStateOf("HOME") }
-                // Variabel buat nyimpen buku mana yang lagi mau diedit
                 var selectedBookToEdit by remember { mutableStateOf<Book?>(null) }
 
-                if (currentScreen == "HOME") {
-                    HomeScreen(
-                        bookDao = bookDao,
-                        onAddClick = {
-                            selectedBookToEdit = null // Pastikan kosong buat nambah baru
-                            currentScreen = "ADD_OR_EDIT"
-                        },
-                        onEditClick = { book ->
-                            selectedBookToEdit = book // Isi data buku yang mau diedit
-                            currentScreen = "ADD_OR_EDIT"
-                        }
-                    )
+                // 3. LOGIKA PENENTUAN LAYAR: Input Nama vs App Utama
+                if (userName.isEmpty()) {
+                    // Jika nama kosong, paksa user isi nama dulu
+                    WelcomeScreen(onSaveName = { inputName ->
+                        sharedPrefs.edit().putString("user_name", inputName).apply()
+                        userName = inputName
+                    })
                 } else {
-                    // Layar ini sekarang REUSABLE (Bisa Add, Bisa Edit)
-                    AddBookScreen(
-                        bookDao = bookDao,
-                        bookToEdit = selectedBookToEdit, // Kirim datanya kesini
-                        onNavigateBack = { currentScreen = "HOME" }
+                    // Jika nama sudah ada, lanjut ke App
+                    if (currentScreen == "HOME") {
+                        HomeScreen(
+                            bookDao = bookDao,
+                            userName = userName, // Kirim nama ke Home
+                            onAddClick = {
+                                selectedBookToEdit = null
+                                currentScreen = "ADD_OR_EDIT"
+                            },
+                            onEditClick = { book ->
+                                selectedBookToEdit = book
+                                currentScreen = "ADD_OR_EDIT"
+                            }
+                        )
+                    } else {
+                        AddBookScreen(
+                            bookDao = bookDao,
+                            bookToEdit = selectedBookToEdit,
+                            onNavigateBack = { currentScreen = "HOME" }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- LAYAR BARU: INPUT NAMA (HANYA MUNCUL SEKALI) ---
+@Composable
+fun WelcomeScreen(onSaveName: (String) -> Unit) {
+    var nameInput by remember { mutableStateOf("") }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = White
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Background Image (Fix error background painterResource)
+            Image(
+                painter = painterResource(id = R.drawable.bg_ui),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds
+            )
+
+            Column(
+                modifier = Modifier.fillMaxSize().padding(30.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = "Welcome to Pagewise!", style = MaterialTheme.typography.titleMedium, color = White, fontSize = 28.sp)
+                Spacer(modifier = Modifier.height(0.dp))
+                Text(text = "What should we call you?", color = White, style = MaterialTheme.typography.labelMedium, fontSize = 18.sp)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    label = { Text("Enter your name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = UiDark,
+                        unfocusedBorderColor = UiMedium,
+                        focusedLabelColor = UiLight,
+                        cursorColor = UiDark,
+                        unfocusedContainerColor = White.copy(alpha = 0.8f),
+                        focusedContainerColor = White.copy(alpha = 0.9f)
                     )
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { if (nameInput.isNotBlank()) onSaveName(nameInput) },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = UiDark),
+                    enabled = nameInput.isNotBlank()
+                ) {
+                    Text("Get Started", color = White)
                 }
             }
         }
@@ -71,14 +150,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun HomeScreen(
     bookDao: BookDao,
+    userName: String, // Terima parameter nama
     onAddClick: () -> Unit,
-    onEditClick: (Book) -> Unit // Callback pas card diklik
+    onEditClick: (Book) -> Unit
 ) {
     val bookList by bookDao.getAllBooks().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
-
-    // --- STATE DELETE DIALOG ---
-    // Kalau ini ada isinya (gak null), dialog muncul
     var bookToDelete by remember { mutableStateOf<Book?>(null) }
 
     if (bookToDelete != null) {
@@ -91,7 +168,7 @@ fun HomeScreen(
                     onClick = {
                         scope.launch {
                             bookToDelete?.let { bookDao.deleteBook(it) }
-                            bookToDelete = null // Tutup dialog
+                            bookToDelete = null
                         }
                     }
                 ) { Text("Yes, Delete", color = Color.Red) }
@@ -103,7 +180,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = { Header() },
+        topBar = { Header(userName) }, // Kirim nama ke Header
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddClick,
@@ -127,8 +204,8 @@ fun HomeScreen(
                     items(bookList) { bookItem ->
                         BookCard(
                             book = bookItem,
-                            onClick = { onEditClick(bookItem) }, // Klik Card -> Edit
-                            onDeleteClick = { bookToDelete = bookItem } // Klik Sampah -> Muncul Dialog
+                            onClick = { onEditClick(bookItem) },
+                            onDeleteClick = { bookToDelete = bookItem }
                         )
                     }
                 }
@@ -137,16 +214,15 @@ fun HomeScreen(
     }
 }
 
-// ... Header tetep sama ...
 @Composable
-fun Header() {
+fun Header(userName: String) {
     Surface(modifier = Modifier.fillMaxWidth(), color = UiDark) {
         Column(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.statusBarsPadding().fillMaxWidth().height(60.dp).padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
         ) {
             Text(text = "Pagewise", color = Color.White, style = MaterialTheme.typography.titleMedium, fontSize = 24.sp, lineHeight = 24.sp)
-            Text(text = "Welcome back, Michael!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontSize = 16.sp, lineHeight = 18.sp, modifier = Modifier.offset(y = (-6).dp))
+            Text(text = "Welcome back, $userName!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontSize = 16.sp, lineHeight = 18.sp, modifier = Modifier.offset(y = (-6).dp))
         }
     }
 }
@@ -154,8 +230,8 @@ fun Header() {
 @Composable
 fun BookCard(
     book: Book,
-    onClick: () -> Unit,      // Callback klik card
-    onDeleteClick: () -> Unit // Callback klik sampah
+    onClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(10.dp),
@@ -164,7 +240,7 @@ fun BookCard(
             .fillMaxWidth()
             .height(135.dp)
             .shadow(elevation = 10.dp)
-            .clickable { onClick() } // Bikin Card bisa diklik buat edit
+            .clickable { onClick() }
     ) {
         Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.width(90.dp).fillMaxHeight().zIndex(1f).background(Color.Gray)) {
@@ -184,13 +260,12 @@ fun BookCard(
                         Text(text = book.status, color = Color.White, style = MaterialTheme.typography.titleMedium, fontSize = 14.sp, lineHeight = 14.sp)
                     }
 
-                    // --- TOMBOL TRASH ---
                     Box(modifier = Modifier
                         .fillMaxHeight()
                         .width(25.dp)
                         .clip(shape = RoundedCornerShape(13.dp))
                         .background(White)
-                        .clickable { onDeleteClick() }, // Klik Trash -> Panggil fungsi delete
+                        .clickable { onDeleteClick() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(painter = painterResource(R.drawable.ic_trash_can), tint = UiDark, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -206,7 +281,6 @@ fun BookCard(
     }
 }
 
-// ... ProgressBar tetep sama ...
 @Composable
 fun ProgressBar(progress: Float) {
     Row(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(White)) {
@@ -215,7 +289,6 @@ fun ProgressBar(progress: Float) {
     }
 }
 
-// --- UPDATE PREVIEW BIAR GAK ERROR ---
 class FakeBookDao : BookDao {
     override fun getAllBooks() = flowOf(listOf(
         Book(1, "Preview Title", "Subtitle", "Reading", 50, 200)
@@ -225,22 +298,29 @@ class FakeBookDao : BookDao {
     override suspend fun deleteBook(book: Book) {}
     override suspend fun updateBook(book: Book) {}
 
-    // Wajib ada karena getBookById ada di interface asli
     override suspend fun getBookById(id: Int): Book? {
         return Book(1, "Preview Title", "Subtitle", "Reading", 50, 200)
     }
 
-    // 👇 TAMBAHKAN INI (PENYEBAB ERROR) 👇
     override suspend fun getReadingBook(): Book? {
-        // Balikin buku dummy biar preview gak error
         return Book(1, "Funiculi Funicula", "Reading Preview", "Reading", 50, 200)
     }
 }
 
+//@Preview(showBackground = true, showSystemUi = true)
+//@Composable
+//fun PreviewHome() {
+//    PagewiseTheme {
+//        HomeScreen(
+//            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "test"
+//        )
+//    }
+//}
+
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewHome() {
+fun PreviewWelcome() {
     PagewiseTheme {
-        HomeScreen(bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {})
+        WelcomeScreen(onSaveName = {})
     }
 }
