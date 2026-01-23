@@ -28,6 +28,7 @@ import coil.compose.AsyncImage
 import com.example.pagewise.ui.theme.*
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,7 +56,7 @@ class MainActivity : ComponentActivity() {
                 if (userName.isEmpty()) {
                     // Jika nama kosong, paksa user isi nama dulu
                     WelcomeScreen(onSaveName = { inputName ->
-                        sharedPrefs.edit().putString("user_name", inputName).apply()
+                        sharedPrefs.edit { putString("user_name", inputName) }
                         userName = inputName
                     })
                 } else {
@@ -86,7 +87,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- LAYAR BARU: INPUT NAMA (HANYA MUNCUL SEKALI) ---
+// --- LAYAR INPUT NAMA (HANYA MUNCUL SEKALI) ---
 @Composable
 fun WelcomeScreen(onSaveName: (String) -> Unit) {
     var nameInput by remember { mutableStateOf("") }
@@ -96,7 +97,6 @@ fun WelcomeScreen(onSaveName: (String) -> Unit) {
         color = White
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Background Image (Fix error background painterResource)
             Image(
                 painter = painterResource(id = R.drawable.bg_ui),
                 contentDescription = null,
@@ -150,7 +150,7 @@ fun WelcomeScreen(onSaveName: (String) -> Unit) {
 @Composable
 fun HomeScreen(
     bookDao: BookDao,
-    userName: String, // Terima parameter nama
+    userName: String,
     onAddClick: () -> Unit,
     onEditClick: (Book) -> Unit
 ) {
@@ -180,7 +180,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        topBar = { Header(userName) }, // Kirim nama ke Header
+        topBar = { Header(userName) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddClick,
@@ -307,15 +307,15 @@ class FakeBookDao : BookDao {
     }
 }
 
-//@Preview(showBackground = true, showSystemUi = true)
-//@Composable
-//fun PreviewHome() {
-//    PagewiseTheme {
-//        HomeScreen(
-//            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "test"
-//        )
-//    }
-//}
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+fun PreviewHome() {
+    PagewiseTheme {
+        HomeScreen(
+            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "test"
+        )
+    }
+}
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable

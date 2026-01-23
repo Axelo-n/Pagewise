@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,12 +34,13 @@ import com.example.pagewise.ui.theme.White
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddBookScreen(
     bookDao: BookDao,
-    bookToEdit: Book? = null, // Parameter baru: Kalau null berarti Mode Tambah, kalau ada isi berarti Mode Edit
+    bookToEdit: Book? = null,
     onNavigateBack: () -> Unit
 ) {
 
@@ -53,7 +55,7 @@ fun AddBookScreen(
     var totalPages by remember { mutableStateOf(bookToEdit?.totalPages?.toString() ?: "") }
 
     // Logic gambar: Kalo ada gambar lama, pake itu. Kalo user pick baru, ganti.
-    var imageUri by remember { mutableStateOf<Uri?>(bookToEdit?.imagePath?.let { Uri.parse(it) }) }
+    var imageUri by remember { mutableStateOf(bookToEdit?.imagePath?.toUri()) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -65,9 +67,7 @@ fun AddBookScreen(
             val flag = Intent.FLAG_GRANT_READ_URI_PERMISSION
             try {
                 context.contentResolver.takePersistableUriPermission(it, flag)
-            } catch (e: Exception) {
-                // Handle error kalo permission gagal (opsional)
-            }
+            } catch (e: Exception) {}
             imageUri = it
         }
     }
@@ -79,7 +79,7 @@ fun AddBookScreen(
                 title = { Text(if (bookToEdit == null) "Add New Book" else "Edit Book", color = White) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = UiDark)
@@ -163,7 +163,6 @@ fun AddBookScreen(
                     if (title.isNotEmpty() && totalPages.isNotEmpty()) {
                         scope.launch {
                             val bookData = Book(
-                                // PENTING: Kalo edit, ID harus sama dgn yg lama. Kalo baru, ID 0 (auto-generate)
                                 id = bookToEdit?.id ?: 0,
                                 title = title,
                                 subtitle = subtitle,
@@ -174,9 +173,11 @@ fun AddBookScreen(
                             )
 
                             if (bookToEdit == null) {
-                                bookDao.insertBook(bookData) // Mode Tambah
+                                // --- INSERT ---
+                                bookDao.insertBook(bookData)
                             } else {
-                                bookDao.updateBook(bookData) // Mode Edit
+                                // --- UPDATE ---
+                                bookDao.updateBook(bookData)
                             }
                             onNavigateBack()
                         }
@@ -200,13 +201,12 @@ fun AddBookScreenPreview() {
         override suspend fun deleteBook(book: Book) {}
         override suspend fun updateBook(book: Book) {}
 
-        // 👇 TAMBAHAN WAJIB (Biar gak error abstract member)
         override suspend fun getBookById(id: Int): Book? {
-            return null // Return null aja buat preview
+            return null
         }
 
         override suspend fun getReadingBook(): Book? {
-            return null // Return null aja buat preview
+            return null
         }
     }
 

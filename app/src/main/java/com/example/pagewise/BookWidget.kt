@@ -55,6 +55,7 @@ import com.example.pagewise.ui.theme.White
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.core.net.toUri
 
 class SimpleBookWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = SimpleBookWidget()
@@ -85,14 +86,14 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
                 // LOGIKA LOAD GAMBAR (SUPPORT URI & FILE)
                 if (fetchedBook != null && !fetchedBook.imagePath.isNullOrEmpty()) {
                     try {
-                        val imagePath = fetchedBook.imagePath!!
+                        val imagePath = fetchedBook.imagePath
                         val options = BitmapFactory.Options()
                         options.inSampleSize = 4 // Tetap perkecil biar hemat memori
 
                         // Cek apakah ini URI (content://) atau File biasa
                         if (imagePath.startsWith("content://")) {
                             // CARA 1: Load dari URI (Galeri)
-                            val uri = Uri.parse(imagePath)
+                            val uri = imagePath.toUri()
                             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                                 coverBitmap = BitmapFactory.decodeStream(inputStream, null, options)
                             }
@@ -113,7 +114,7 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
     }
 
     // --- COLORS ---
-    val bgCard = ColorProvider(UiLight) // Langsung ambil warna Card
+    val bgCard = ColorProvider(UiLight)
     val textPrimary = ColorProvider(UiDark)
     val textSubtitle = ColorProvider(UiMedium)
     val whiteProvider = ColorProvider(White)
@@ -122,7 +123,7 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .height(110.dp) // Tinggi Card disamakan dengan App
+            .height(110.dp)
             .padding(0.dp)
             .clickable(actionStartActivity<MainActivity>())
     ) {
@@ -130,8 +131,8 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(textPrimary) // <--- Langsung warna UiLight
-                .cornerRadius(10.dp) // <--- Rounded Corner 10.dp
+                .background(textPrimary)
+                .cornerRadius(10.dp)
         ) {
             if (book != null) {
                 Row(
