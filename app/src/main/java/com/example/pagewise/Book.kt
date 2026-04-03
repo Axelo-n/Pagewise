@@ -12,5 +12,6 @@ data class Book(
     val status: String,
     val currentPage: Int,
     val totalPages: Int,
-    val imagePath: String? = null // Kolom baru buat simpan alamat foto
+    val imagePath: String? = null, // Kolom baru buat simpan alamat foto
+    var notes: String = ""
 )

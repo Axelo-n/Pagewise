@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
 
                 val scope = rememberCoroutineScope()
                 var currentScreen by remember { mutableStateOf("HOME") }
-                var selectedBookToEdit by remember { mutableStateOf<Book?>(null) }
+                var selectedBook by remember { mutableStateOf<Book?>(null) }
 
                 if (userName.isEmpty()) {
                     WelcomeScreen(onSaveName = { inputName ->
@@ -104,15 +104,34 @@ class MainActivity : ComponentActivity() {
                             bookDao = bookDao,
                             userName = userName,
                             onAddClick = {
-                                selectedBookToEdit = null
+                                selectedBook = null
                                 currentScreen = "ADD_OR_EDIT"
                             },
                             onEditClick = { book ->
-                                selectedBookToEdit = book
-                                currentScreen = "ADD_OR_EDIT"
+                                selectedBook = book
+                                currentScreen = "DETAIL"
                             },
                             onSearchClick = {
                                 currentScreen = "SEARCH"
+                            }
+                        )
+                    } else if (currentScreen == "DETAIL" && selectedBook != null) {
+                        BookDetailScreen(
+                            book = selectedBook!!,
+                            onNavigateBack = { currentScreen = "HOME" },
+                            onEditClick = { currentScreen = "ADD_OR_EDIT" },
+                            onDeleteClick = {
+                                scope.launch {
+                                    bookDao.deleteBook(selectedBook!!)
+                                    currentScreen = "HOME"
+                                }
+                            },
+                            onSaveNotes = { newNotes ->
+                                scope.launch {
+                                    val updatedBook = selectedBook!!.copy(notes = newNotes)
+                                    bookDao.updateBook(updatedBook)
+                                    selectedBook = updatedBook // Update state layar
+                                }
                             }
                         )
                     } else if (currentScreen == "SEARCH") {
@@ -141,7 +160,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         AddBookScreen(
                             bookDao = bookDao,
-                            bookToEdit = selectedBookToEdit,
+                            bookToEdit = selectedBook,
                             onNavigateBack = { currentScreen = "HOME" }
                         )
                     }
