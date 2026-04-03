@@ -6,12 +6,50 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,15 +58,20 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.content.edit
 import coil.compose.AsyncImage
-import com.example.pagewise.ui.theme.*
+import com.example.pagewise.ui.theme.PagewiseTheme
+import com.example.pagewise.ui.theme.UiDark
+import com.example.pagewise.ui.theme.UiLight
+import com.example.pagewise.ui.theme.UiMedium
+import com.example.pagewise.ui.theme.White
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
-import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(sharedPrefs.getString("user_name", "") ?: "")
                 }
 
+                val scope = rememberCoroutineScope()
                 var currentScreen by remember { mutableStateOf("HOME") }
                 var selectedBookToEdit by remember { mutableStateOf<Book?>(null) }
 
@@ -66,6 +110,32 @@ class MainActivity : ComponentActivity() {
                             onEditClick = { book ->
                                 selectedBookToEdit = book
                                 currentScreen = "ADD_OR_EDIT"
+                            },
+                            onSearchClick = {
+                                currentScreen = "SEARCH"
+                            }
+                        )
+                    } else if (currentScreen == "SEARCH") {
+                        // --- LAYAR BARU ---
+                        SearchScreen(
+                            onNavigateBack = { currentScreen = "HOME" },
+                            onAddBook = { scrapedBook ->
+                                scope.launch {
+                                    val localImagePath = downloadAndSaveImage(context, scrapedBook.imageUrl)
+                                    // Masukin data hasil scrape ke database lokal
+                                    bookDao.insertBook(
+                                        Book(
+                                            id = 0, // Auto generate
+                                            title = scrapedBook.title,
+                                            subtitle = scrapedBook.author,
+                                            status = "On Shelf", // DEFAULT STATUS
+                                            currentPage = 0,     // PAGES DIKOSONGIN (0)
+                                            totalPages = 0,      // PAGES DIKOSONGIN (0)
+                                            imagePath = localImagePath
+                                        )
+                                    )
+                                    currentScreen = "HOME" // Langsung balik ke home setelah sukses nambah
+                                }
                             }
                         )
                     } else {
@@ -155,7 +225,8 @@ fun HomeScreen(
     bookDao: BookDao,
     userName: String,
     onAddClick: () -> Unit,
-    onEditClick: (Book) -> Unit
+    onEditClick: (Book) -> Unit,
+    onSearchClick: () -> Unit
 ) {
     val bookList by bookDao.getAllBooks().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -191,7 +262,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 15.sp,
                     lineHeight = 22.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -231,13 +302,29 @@ fun HomeScreen(
     Scaffold(
         topBar = { Header(userName) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddClick,
-                containerColor = UiDark,
-                contentColor = White,
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(painter = painterResource(id = R.drawable.ic_plus_button), contentDescription = "Add", modifier = Modifier.size(24.dp))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                // TOMBOL BARU: SEARCH GRAMEDIA
+                FloatingActionButton(
+                    onClick = onSearchClick,
+                    containerColor = UiLight, // Beda warna dikit biar hierarkinya jelas
+                    contentColor = UiDark,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Search Gramedia", modifier = Modifier.size(24.dp))
+                }
+
+                // TOMBOL LAMA: MANUAL ADD (+)
+                FloatingActionButton(
+                    onClick = onAddClick,
+                    containerColor = UiDark,
+                    contentColor = White,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Icon(painter = painterResource(id = R.drawable.ic_plus_button), contentDescription = "Add", modifier = Modifier.size(24.dp))
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.End
@@ -370,8 +457,9 @@ class FakeBookDao : BookDao {
 fun PreviewHome() {
     PagewiseTheme {
         HomeScreen(
-            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "Vin"
-        )
+            bookDao = FakeBookDao(), userName = "Vin", onAddClick = {},
+            onEditClick = {},
+        ) {}
     }
 }
 

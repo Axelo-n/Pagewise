@@ -72,4 +72,7 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
     debugImplementation("androidx.glance:glance-appwidget-preview:1.1.1")
+
+    // Jsoup (HTML)
+    implementation("org.jsoup:jsoup:1.22.1")
 }
