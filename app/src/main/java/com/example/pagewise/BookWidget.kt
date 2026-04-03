@@ -77,28 +77,26 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
     var book by remember { mutableStateOf<Book?>(previewBook) }
     var coverBitmap by remember { mutableStateOf<Bitmap?>(previewBitmap) }
 
+    // ... (Bagian LaunchedEffect SAMA PERSIS, tidak perlu diubah) ...
     LaunchedEffect(Unit) {
         if (previewBook == null) {
             withContext(Dispatchers.IO) {
                 val db = AppDatabase.getDatabase(context)
                 val fetchedBook = db.bookDao().getReadingBook()
 
-                // LOGIKA LOAD GAMBAR (SUPPORT URI & FILE)
                 if (fetchedBook != null && !fetchedBook.imagePath.isNullOrEmpty()) {
                     try {
                         val imagePath = fetchedBook.imagePath
                         val options = BitmapFactory.Options()
-                        options.inSampleSize = 4 // Tetap perkecil biar hemat memori
+                        // ⚠️ PENTING: Jangan terlalu kecil sampleSize-nya biar gambar gak pecah pas di-stretch
+                        options.inSampleSize = 2
 
-                        // Cek apakah ini URI (content://) atau File biasa
                         if (imagePath.startsWith("content://")) {
-                            // CARA 1: Load dari URI (Galeri)
                             val uri = imagePath.toUri()
                             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                                 coverBitmap = BitmapFactory.decodeStream(inputStream, null, options)
                             }
                         } else {
-                            // CARA 2: Load dari File Biasa
                             val file = File(imagePath)
                             if (file.exists()) {
                                 coverBitmap = BitmapFactory.decodeFile(file.absolutePath, options)
@@ -119,15 +117,15 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
     val textSubtitle = ColorProvider(UiMedium)
     val whiteProvider = ColorProvider(White)
 
-    // CONTAINER UTAMA (CARD TANPA SHADOW)
+    // CONTAINER UTAMA
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .height(110.dp)
-            .padding(0.dp)
+            .height(110.dp) // Tinggi Widget Fixed
+            .padding(8.dp) // Padding luar widget
             .clickable(actionStartActivity<MainActivity>())
     ) {
-        // BACKGROUND KARTU (Solid Color + Rounded)
+        // BACKGROUND KARTU UTAMA
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
@@ -135,44 +133,58 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
                 .cornerRadius(10.dp)
         ) {
             if (book != null) {
+                // ROW UTAMA (Membagi Kiri & Kanan)
                 Row(
                     modifier = GlanceModifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1. COVER IMAGE (Kiri)
+                    // --- KOLOM KIRI (GAMBAR) ---
+                    // Kita set width sekitar 75-80dp (rasio buku umum)
+                    // Menggunakan ContentScale.Fit agar gambar TIDAK TERPOTONG
                     Box(
                         modifier = GlanceModifier
-                            .width(65.dp)
-                            .fillMaxHeight()
-                            .cornerRadius(0.dp)
-                            .background(textSubtitle),
+                            .width(74.dp) // Lebar area cover
+                            .fillMaxHeight() // Tinggi mentok
+                            .background(textSubtitle), // Warna background kalau rasio gambar beda
                         contentAlignment = Alignment.Center
                     ) {
                         if (coverBitmap != null) {
                             Image(
                                 provider = ImageProvider(coverBitmap!!),
                                 contentDescription = "Cover",
-                                contentScale = ContentScale.Fit,
-                                modifier = GlanceModifier.fillMaxSize().cornerRadius(0.dp)
+                                // Fit: Gambar dimuat utuh, menyesuaikan tinggi/lebar tanpa terpotong
+                                contentScale = ContentScale.Crop,
+                                modifier = GlanceModifier.fillMaxSize()
+                            )
+                        } else {
+                            // Placeholder kalau gambar null tapi buku ada
+                            Image(
+                                provider = ImageProvider(R.drawable.ic_launcher_foreground), // Ganti icon placeholder kamu
+                                contentDescription = null,
+                                modifier = GlanceModifier.size(30.dp),
+                                colorFilter = ColorFilter.tint(whiteProvider)
                             )
                         }
                     }
 
-                    // 2. KONTEN KANAN
+                    Spacer(modifier = GlanceModifier.width(16.dp))
+
+                    // --- KOLOM KANAN (INFO) ---
+                    // defaultWeight() = Ambil sisa ruang yang ada setelah dikurangi gambar
                     Column(
                         modifier = GlanceModifier
-                            .fillMaxSize()
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .defaultWeight()
+                            .fillMaxHeight()
+                            .padding(horizontal = 16.dp, vertical = 10.dp), // Padding Kanan-Kiri Text
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // --- JUDUL ---
                         Text(
                             text = book!!.title,
-                            modifier = GlanceModifier.padding(bottom = 0.dp),
                             style = TextStyle(
                                 color = whiteProvider,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 18.sp
                             ),
                             maxLines = 1
                         )
@@ -180,37 +192,39 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
                         // --- SUBTITLE ---
                         Text(
                             text = book!!.subtitle,
-                            modifier = GlanceModifier.padding(top = 0.dp),
+                            modifier = GlanceModifier.padding(top = 2.dp),
                             style = TextStyle(
-                                color = bgCard,
+                                color = bgCard, // Warna agak redup
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             ),
                             maxLines = 1
                         )
 
-                        Spacer(modifier = GlanceModifier.height(8.dp))
+                        Spacer(modifier = GlanceModifier.height(10.dp))
 
                         // --- PROGRESS BAR ---
                         val progress = if (book!!.totalPages > 0) book!!.currentPage.toFloat() / book!!.totalPages.toFloat() else 0f
                         LinearProgressIndicator(
                             progress = progress,
-                            modifier = GlanceModifier.fillMaxWidth().height(8.dp),
+                            modifier = GlanceModifier.fillMaxWidth().height(6.dp).cornerRadius(3.dp),
                             color = whiteProvider,
                             backgroundColor = textSubtitle
                         )
 
-                        Spacer(modifier = GlanceModifier.height(4.dp))
+                        Spacer(modifier = GlanceModifier.height(6.dp))
 
                         // --- TEXT HALAMAN ---
                         Text(
-                            text = "${book!!.currentPage}/${book!!.totalPages}",
+                            text = "${book!!.currentPage} of ${book!!.totalPages} pages",
                             style = TextStyle(
                                 color = whiteProvider,
                                 fontSize = 10.sp
                             )
                         )
                     }
+
+                    Spacer(modifier = GlanceModifier.width(16.dp))
                 }
             } else {
                 // EMPTY STATE
@@ -218,7 +232,7 @@ fun WidgetContent(context: Context, previewBook: Book? = null, previewBitmap: Bi
                     modifier = GlanceModifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("No Reading Book", style = TextStyle(color = textSubtitle))
+                    Text("No Reading Book", style = TextStyle(color = whiteProvider))
                 }
             }
         }

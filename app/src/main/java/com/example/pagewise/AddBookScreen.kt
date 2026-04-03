@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +34,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,7 +152,7 @@ fun AddBookScreen(
             Spacer(modifier = Modifier.height(20.dp))
             Text("Status:", modifier = Modifier.align(Alignment.Start), style = MaterialTheme.typography.labelLarge)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Reading", "Finished", "On Shelf").forEach { statusOption ->
+                listOf("Reading", "Finished", "On Shelf", "Wishlist").forEach { statusOption ->
                     FilterChip(
                         selected = status == statusOption,
                         onClick = { status = statusOption },
@@ -162,6 +168,18 @@ fun AddBookScreen(
                 onClick = {
                     if (title.isNotEmpty() && totalPages.isNotEmpty()) {
                         scope.launch {
+                            // Tentukan final image path-nya
+                            var finalImagePath = bookToEdit?.imagePath // Default pakai path lama (kalo mode edit)
+
+                            // Cek apakah imageUri bukan null DAN ini dari galeri (awalan content://)
+                            // Kalau user milih gambar baru, kita compress & save ke HP!
+                            if (imageUri != null && imageUri.toString().startsWith("content://")) {
+                                val savedFilePath = compressAndSaveImage(context, imageUri!!)
+                                if (savedFilePath != null) {
+                                    finalImagePath = savedFilePath // Pake path yang baru di-compress
+                                }
+                            }
+
                             val bookData = Book(
                                 id = bookToEdit?.id ?: 0,
                                 title = title,
@@ -169,7 +187,7 @@ fun AddBookScreen(
                                 status = status,
                                 currentPage = currentPage.toIntOrNull() ?: 0,
                                 totalPages = totalPages.toIntOrNull() ?: 0,
-                                imagePath = imageUri?.toString()
+                                imagePath = finalImagePath
                             )
 
                             if (bookToEdit == null) {
@@ -188,6 +206,55 @@ fun AddBookScreen(
             ) {
                 Text(if (bookToEdit == null) "Save Book" else "Update Changes", fontSize = 16.sp, color = White)
             }
+        }
+    }
+}
+
+suspend fun compressAndSaveImage(context: Context, uri: Uri): String? {
+    return withContext(Dispatchers.IO) {
+        try {
+            // 1. Cek ukuran asli gambar tanpa memuatnya ke memori secara penuh
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            }
+
+            // 2. Tentukan ukuran maksimal yang aman dan tetap jernih (misal max 800x1200)
+            val reqWidth = 800
+            val reqHeight = 1200
+            var inSampleSize = 1
+
+            if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
+                val halfHeight: Int = options.outHeight / 2
+                val halfWidth: Int = options.outWidth / 2
+                while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                    inSampleSize *= 2
+                }
+            }
+
+            // 3. Load gambar asli tapi sudah di-downsample rasionya
+            options.inJustDecodeBounds = false
+            options.inSampleSize = inSampleSize
+            val bitmap = context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            } ?: return@withContext null
+
+            // 4. Bikin file baru di penyimpanan internal aplikasi (biar gak hilang)
+            val fileName = "cover_${System.currentTimeMillis()}.jpg"
+            val file = File(context.filesDir, fileName)
+
+            // 5. Compress dan simpan! (Quality 80% itu sweet spot, file kecil tapi tetep tajem)
+            FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            }
+
+            // Balikin path file yang udah jadi biar bisa disave ke Room Database
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }

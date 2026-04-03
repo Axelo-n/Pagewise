@@ -15,11 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,7 +34,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Inisialisasi SharedPreferences
         val sharedPrefs = getSharedPreferences("PagewisePrefs", MODE_PRIVATE)
 
         setContent {
@@ -43,28 +42,23 @@ class MainActivity : ComponentActivity() {
                 val db = remember { AppDatabase.getDatabase(context) }
                 val bookDao = db.bookDao()
 
-                // 2. Ambil nama yang tersimpan (default "" kalau kosong)
                 var userName by remember {
                     mutableStateOf(sharedPrefs.getString("user_name", "") ?: "")
                 }
 
-                // STATE NAVIGASI
                 var currentScreen by remember { mutableStateOf("HOME") }
                 var selectedBookToEdit by remember { mutableStateOf<Book?>(null) }
 
-                // 3. LOGIKA PENENTUAN LAYAR: Input Nama vs App Utama
                 if (userName.isEmpty()) {
-                    // Jika nama kosong, paksa user isi nama dulu
                     WelcomeScreen(onSaveName = { inputName ->
                         sharedPrefs.edit { putString("user_name", inputName) }
                         userName = inputName
                     })
                 } else {
-                    // Jika nama sudah ada, lanjut ke App
                     if (currentScreen == "HOME") {
                         HomeScreen(
                             bookDao = bookDao,
-                            userName = userName, // Kirim nama ke Home
+                            userName = userName,
                             onAddClick = {
                                 selectedBookToEdit = null
                                 currentScreen = "ADD_OR_EDIT"
@@ -87,7 +81,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- LAYAR INPUT NAMA (HANYA MUNCUL SEKALI) ---
 @Composable
 fun WelcomeScreen(onSaveName: (String) -> Unit) {
     var nameInput by remember { mutableStateOf("") }
@@ -123,9 +116,19 @@ fun WelcomeScreen(onSaveName: (String) -> Unit) {
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        // --- BORDER ---
                         focusedBorderColor = UiDark,
                         unfocusedBorderColor = UiMedium,
-                        focusedLabelColor = UiLight,
+
+                        // --- LABEL ("Enter your name") ---
+                        focusedLabelColor = UiDark,    // UBAH: Jangan UiLight biar kontras
+                        unfocusedLabelColor = UiMedium, // TAMBAH: Biar pas lagi ga diklik tetep kelihatan
+
+                        // --- TEKS KETIKAN USER ---
+                        focusedTextColor = UiDark,     // TAMBAH: Biar teks yang diketik warnanya gelap
+                        unfocusedTextColor = UiDark,   // TAMBAH: Biar pas kursor pindah teks tetep gelap
+
+                        // --- LAINNYA ---
                         cursorColor = UiDark,
                         unfocusedContainerColor = White.copy(alpha = 0.8f),
                         focusedContainerColor = White.copy(alpha = 0.9f)
@@ -161,20 +164,66 @@ fun HomeScreen(
     if (bookToDelete != null) {
         AlertDialog(
             onDismissRequest = { bookToDelete = null },
-            title = { Text("Delete Book?") },
-            text = { Text("Are you sure you want to delete '${bookToDelete?.title}'?") },
+            shape = RoundedCornerShape(20.dp), // Bikin sudutnya membulat estetik
+            containerColor = White, // Background putih bersih
+            titleContentColor = UiDark,
+            textContentColor = UiMedium,
+            // Tambahin icon trash di atas biar ala-ala aplikasi modern
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_trash_can),
+                    contentDescription = "Delete Icon",
+                    tint = Color(0xFFE53935), // Merah yang enak dilihat (Material Red)
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete Book?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete '${bookToDelete?.title}'?\nThis action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
             confirmButton = {
-                TextButton(
+                // Tombol Delete dibikin Solid Red biar tegas
+                Button(
                     onClick = {
                         scope.launch {
                             bookToDelete?.let { bookDao.deleteBook(it) }
                             bookToDelete = null
                         }
-                    }
-                ) { Text("Yes, Delete", color = Color.Red) }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.SemiBold)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { bookToDelete = null }) { Text("Cancel") }
+                // Tombol Cancel dibikin TextButton aja (ghost button) warna gelap
+                TextButton(
+                    onClick = { bookToDelete = null },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = UiDark
+                    )
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.SemiBold)
+                }
             }
         )
     }
@@ -195,19 +244,20 @@ fun HomeScreen(
     ) { innerPadding ->
         Surface(modifier = Modifier.fillMaxSize().padding(innerPadding), color = White) {
             Image(painter = painterResource(id = R.drawable.bg_ui), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
-            Column(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                    contentPadding = PaddingValues(top = 20.dp, bottom = 100.dp)
-                ) {
-                    items(bookList) { bookItem ->
-                        BookCard(
-                            book = bookItem,
-                            onClick = { onEditClick(bookItem) },
-                            onDeleteClick = { bookToDelete = bookItem }
-                        )
-                    }
+
+            // OPTIMASI: Column redundan dihapus, LazyColumn langsung jadi child dari Surface
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                contentPadding = PaddingValues(top = 20.dp, bottom = 100.dp)
+            ) {
+                // OPTIMASI: Tambah key = { it.id } agar rendering list super cepat
+                items(items = bookList, key = { it.id }) { bookItem ->
+                    BookCard(
+                        book = bookItem,
+                        onClick = { onEditClick(bookItem) },
+                        onDeleteClick = { bookToDelete = bookItem }
+                    )
                 }
             }
         }
@@ -236,10 +286,10 @@ fun BookCard(
     Card(
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = UiLight),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp), // OPTIMASI: Pindah dari Modifier.shadow ke properti elevation bawaan
         modifier = Modifier
             .fillMaxWidth()
             .height(135.dp)
-            .shadow(elevation = 10.dp)
             .clickable { onClick() }
     ) {
         Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -273,20 +323,28 @@ fun BookCard(
                 }
                 Text(text = book.title, style = MaterialTheme.typography.titleMedium, fontSize = 24.sp, lineHeight = 24.sp, color = UiDark, maxLines = 1)
                 Text(text = book.subtitle, style = MaterialTheme.typography.labelMedium, fontSize = 14.sp, lineHeight = 14.sp, color = UiMedium, modifier = Modifier.offset(y = (-6).dp), maxLines = 1)
+
                 val progressValue = if (book.totalPages > 0) book.currentPage.toFloat() / book.totalPages.toFloat() else 0f
                 ProgressBar(progress = progressValue)
+
                 Text(text = "Page ${book.currentPage}/${book.totalPages}", style = MaterialTheme.typography.labelMedium, fontSize = 14.sp, lineHeight = 14.sp, color = UiDark)
             }
         }
     }
 }
 
+// OPTIMASI: Ganti Row manual dengan LinearProgressIndicator yang dirender via Canvas (Jauh lebih ringan)
 @Composable
 fun ProgressBar(progress: Float) {
-    Row(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(White)) {
-        if (progress > 0f) Box(modifier = Modifier.fillMaxHeight().weight(progress).clip(RoundedCornerShape(5.dp)).background(UiDark))
-        if (progress < 1f) Box(modifier = Modifier.fillMaxHeight().weight(1f - progress).background(White))
-    }
+    LinearProgressIndicator(
+        progress = progress,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp)),
+        color = UiDark,
+        trackColor = White
+    )
 }
 
 class FakeBookDao : BookDao {
@@ -312,7 +370,7 @@ class FakeBookDao : BookDao {
 fun PreviewHome() {
     PagewiseTheme {
         HomeScreen(
-            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "test"
+            bookDao = FakeBookDao(), onAddClick = {}, onEditClick = {}, userName = "Vin"
         )
     }
 }
