@@ -30,6 +30,7 @@ import com.example.pagewise.ui.theme.UiLight
 import com.example.pagewise.ui.theme.UiMedium
 import com.example.pagewise.ui.theme.White
 import androidx.compose.ui.text.TextRange
+import androidx.activity.compose.BackHandler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +46,17 @@ fun BookDetailScreen(
     var notesValue by remember { mutableStateOf(TextFieldValue(book.notes)) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    BackHandler {
+        // Kalau lagi ngedit notes, tombol back nutup mode editnya dulu
+        if (isEditingNotes) {
+            isEditingNotes = false
+            onSaveNotes(notesValue.text)
+        } else {
+            // Kalau nggak lagi ngedit, baru beneran balik ke Home
+            onNavigateBack()
+        }
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -290,7 +302,10 @@ fun BookDetailScreen(
                                 focusedBorderColor = UiDark,
                                 unfocusedBorderColor = UiMedium.copy(alpha = 0.5f),
                                 focusedContainerColor = UiLight.copy(alpha = 0.2f),
-                                unfocusedContainerColor = White
+                                unfocusedContainerColor = White,
+                                focusedTextColor = UiDark,
+                                unfocusedTextColor = UiDark,
+                                cursorColor = UiDark
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )

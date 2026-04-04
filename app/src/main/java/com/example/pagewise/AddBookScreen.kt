@@ -37,6 +37,7 @@ import androidx.core.net.toUri
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.horizontalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -151,7 +152,12 @@ fun AddBookScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
             Text("Status:", modifier = Modifier.align(Alignment.Start), style = MaterialTheme.typography.labelLarge)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()), // <--- INI KUNCI BIAR BISA DI-SWIPE KE SAMPING
+                horizontalArrangement = Arrangement.spacedBy(8.dp) // Kasih jarak dikit antar chip biar ga dempetan
+            ) {
                 listOf("Reading", "Finished", "On Shelf", "Wishlist").forEach { statusOption ->
                     FilterChip(
                         selected = status == statusOption,

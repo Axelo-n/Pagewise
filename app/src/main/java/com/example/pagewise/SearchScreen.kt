@@ -1,5 +1,6 @@
 package com.example.pagewise
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +39,10 @@ fun SearchScreen(
     var searchResults by remember { mutableStateOf<List<GramediaBook>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    BackHandler {
+        onNavigateBack()
+    }
 
     Scaffold(
         topBar = {
