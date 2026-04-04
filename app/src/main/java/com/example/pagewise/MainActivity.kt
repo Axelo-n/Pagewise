@@ -1,12 +1,14 @@
 package com.example.pagewise
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -409,6 +411,18 @@ fun HomeScreen(
                             onDeleteClick = { bookToDelete = bookItem }
                         )
                     }
+
+                    item {
+                        Text(
+                            text = "Pagewise v3.2 • created by Vin",
+                            color = UiLight.copy(),
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 20.dp, bottom = 40.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -417,12 +431,36 @@ fun HomeScreen(
 
 @Composable
 fun Header(userName: String) {
+    var tapCount by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+
     Surface(modifier = Modifier.fillMaxWidth(), color = UiDark) {
         Column(
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.statusBarsPadding().fillMaxWidth().height(60.dp).padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+            modifier = Modifier
+                .statusBarsPadding()
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
         ) {
-            Text(text = "Pagewise", color = Color.White, style = MaterialTheme.typography.titleMedium, fontSize = 24.sp, lineHeight = 24.sp)
+            Text(
+                text = "Pagewise",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontSize = 24.sp,
+                lineHeight = 24.sp,
+                modifier = Modifier.clickable(
+                    // Biar pas diklik ga ada efek bayangan abu-abu (tetep rahasia)
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    tapCount++
+                    if (tapCount == 5) {
+                        Toast.makeText(context, "Pagewise - Crafted by Michael Kevin", Toast.LENGTH_LONG).show()
+                        tapCount = 0 // Reset hitungan
+                    }
+                }
+            )
             Text(text = "Welcome back, $userName!", color = Color.White, style = MaterialTheme.typography.labelMedium, fontSize = 16.sp, lineHeight = 18.sp, modifier = Modifier.offset(y = (-6).dp))
         }
     }
