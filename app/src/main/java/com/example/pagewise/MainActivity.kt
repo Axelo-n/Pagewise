@@ -269,7 +269,67 @@ fun HomeScreen(
     }
 
     if (bookToDelete != null) {
-        // ... (Kode AlertDialog Delete lu tetep sama persis di sini, ga ada yang diubah)
+        AlertDialog(
+            onDismissRequest = { bookToDelete = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = White,
+            titleContentColor = UiDark,
+            textContentColor = UiMedium,
+            icon = {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_trash_can),
+                    contentDescription = "Delete Icon",
+                    tint = Color(0xFFE53935),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Delete Book?",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete '${bookToDelete?.title}'?\nThis action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            bookToDelete?.let { bookDao.deleteBook(it) }
+                            bookToDelete = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { bookToDelete = null },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = UiDark
+                    )
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
     }
 
     Scaffold(
